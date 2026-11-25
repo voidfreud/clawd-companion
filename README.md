@@ -54,7 +54,7 @@ Clawd notices within a couple of seconds and says "I can see now!". You can swit
 
 ## Privacy
 
-Everything stays on your Mac. Clawd makes no network requests.
+Everything stays on your Mac. The Mac app makes no network requests: the build strips the two Google Fonts links that `desk-clawd.html` uses when it runs as a Claude artifact.
 
 - **Without extra permissions,** Clawd uses the positions of your windows (not their contents), the name of the app in front, and how long since your last keypress or mouse movement.
 - **With Accessibility on,** Clawd also reads window titles, the kind of field you're focused on, the text of dialogs, and the label of the button under a resting cursor. It only uses these to pick a reaction, and only watches the app in front.
