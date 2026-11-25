@@ -1,0 +1,1025 @@
+<title>Desk Clawd</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script type="application/json" id="claude-artifacts-manifest">{"permissions": ["overlay", "menu-bar"]}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: the page is only a doorway. In the installed app the window turns invisible and Clawd walks along the bottom of the real screen. */
+:root{
+  --bg:#17130F; --bg2:#0F0C0A; --ink:#F3ECE6; --muted:#B4A89E; --line:#3A312A;
+  --menu:#FBF8F5; --menu-ink:#1E1915; --menu-muted:#7A6E65; --menu-line:#E7DFD8; --menu-hover:#F1E7DF;
+  --clawd:#D77757; --clawd-dark:#B95F42; --eye:#1A1614;
+  --cookie:#C8925A; --chip:#5A3A24; --ball:#4F84E0; --shine:#E8EEF9; --heart:#E0566C;
+  --shadow:rgba(0,0,0,.28); --bubble:#FFFFFF; --bubble-ink:#1E1915;
+  --font-pixel:"Silkscreen", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-body:"Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);color:var(--ink);font-family:var(--font-body);overflow:hidden}
+#stage{position:fixed;inset:0;overflow:hidden;user-select:none;-webkit-user-select:none}
+
+.intro{position:absolute;top:28px;left:max(28px, env(safe-area-inset-left, 0px));right:max(16px, env(safe-area-inset-right, 0px));max-width:440px;display:grid;gap:10px;z-index:1}
+.intro h1{margin:0;font-family:var(--font-pixel);font-weight:400;font-size:24px;letter-spacing:.02em;color:var(--ink)}
+.intro p{margin:0;font-size:14px;line-height:1.55;color:var(--muted)}
+.intro p.small{font-size:12.5px}
+.intro .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.btn{font:600 13px/1 var(--font-body);color:var(--eye);background:var(--clawd);border:0;border-radius:8px;padding:10px 14px;cursor:pointer}
+.btn:hover{background:#E58A6B}
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{background:rgba(255,255,255,.06)}
+
+/* Installed app before it may float: a small card, nothing else */
+html.gate .intro{inset:0;max-width:none;place-content:center;justify-items:center;text-align:center;padding:24px}
+html.gate .intro p{max-width:300px}
+
+/* Loose on the desktop */
+/* color-scheme must match the app's frame, or the browser paints an opaque backdrop behind a transparent page */
+html.overlay{color-scheme:light}
+html.overlay, html.overlay body{background:transparent!important}
+html.overlay .intro{display:none}
+
+#clawd{position:absolute;left:0;top:0;cursor:grab;touch-action:none;z-index:3;outline:none}
+#clawd.held{cursor:grabbing}
+#clawd svg{display:block;width:100%;height:100%;overflow:visible;shape-rendering:crispEdges}
+#clawd:focus-visible svg{filter:drop-shadow(0 0 0 2px var(--ink))}
+.c-body{fill:var(--clawd)}
+.c-eye{fill:var(--eye)}
+#shadow{position:absolute;height:7px;border-radius:50%;background:var(--shadow);z-index:2;pointer-events:none}
+html.gate #clawd, html.gate #shadow{display:none}
+
+.obj{position:absolute;left:0;top:0;z-index:2;touch-action:none}
+.obj svg{display:block;width:100%;height:100%;shape-rendering:crispEdges}
+.ball{cursor:pointer}
+
+.bubble{position:absolute;left:0;top:0;z-index:5;max-width:240px;padding:7px 11px;background:var(--bubble);color:var(--bubble-ink);
+  border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.25);font:500 13px/1.4 var(--font-body);pointer-events:none;opacity:0;transition:opacity .18s}
+.bubble.on{opacity:1}
+.bubble .ico{display:inline-block;width:16px;height:16px;margin-right:6px;vertical-align:-3px}
+.bubble .ico svg{display:block;width:100%;height:100%;shape-rendering:crispEdges}
+.bubble::after{content:"";position:absolute;bottom:-5px;left:var(--tail,50%);width:10px;height:10px;margin-left:-5px;background:var(--bubble);transform:rotate(45deg)}
+
+.fx{position:absolute;z-index:4;pointer-events:none;animation:rise 1.5s ease-out forwards}
+.fx.z svg{display:block;width:100%;height:100%;shape-rendering:crispEdges;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
+.fx.crumb{width:5px;height:5px;background:var(--cookie);animation:crumb .7s ease-in forwards}
+@keyframes rise{0%{opacity:0;transform:translate(0,0) scale(.6)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx,0px),-70px) scale(1.1)}}
+@keyframes crumb{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(var(--dx,0px),26px)}}
+
+/* Clawd's own right-click menu */
+#menu{position:absolute;z-index:10;min-width:190px;background:var(--menu);color:var(--menu-ink);border-radius:10px;padding:5px;
+  box-shadow:0 10px 30px rgba(0,0,0,.28),0 0 0 1px rgba(0,0,0,.06);font:500 13px/1 var(--font-body)}
+#menu button.item{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:7px 10px;border-radius:6px;cursor:pointer}
+#menu button.item:hover, #menu button.item:focus-visible{background:var(--menu-hover)}
+#menu .check{color:var(--clawd-dark);font-weight:600}
+#menu hr{border:0;border-top:1px solid var(--menu-line);margin:5px 4px}
+#menu .opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 10px}
+#menu .opt span{color:var(--menu-muted);font-size:12px}
+#menu .seg{display:flex;gap:4px}
+#menu .seg button{all:unset;box-sizing:border-box;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--menu-ink);cursor:pointer}
+#menu .seg button:hover{background:var(--menu-hover)}
+#menu .seg button[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--clawd-dark);color:var(--clawd-dark)}
+#menu .needs{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;padding:6px 10px 5px;font-size:12px;color:var(--menu-muted)}
+#menu .bar{height:6px;border-radius:3px;background:var(--menu-line);overflow:hidden}
+#menu .bar i{display:block;height:100%;background:var(--clawd-dark)}
+#menu .bar i.low{background:var(--heart)}
+#menu .swatch{width:14px;height:14px;border-radius:50%;display:block}
+@media (prefers-reduced-motion: reduce){.fx{animation-duration:.9s}}
+</style>
+
+<div id="stage">
+  <div class="intro" id="intro">
+    <h1>Desk Clawd</h1>
+    <p id="introText">A small Clawd who lives along the bottom of your screen. To let Clawd out, open this in the Claude desktop app, click the name above the page and choose Install as app.</p>
+    <p class="small">Click to pet. Drag to carry and toss. Right-click Clawd for snacks, the ball, naps and size.</p>
+    <div class="row" id="introActions"></div>
+  </div>
+  <div id="shadow"></div>
+  <div id="clawd" role="button" tabindex="0" aria-label="Clawd. Press to pet, drag to carry, right-click for more.">
+    <svg viewBox="-3 -2 18 12.5" aria-hidden="true">
+      <g id="squash">
+        <rect class="c-body leg" x="1" y="8" width="1" height="2"/>
+        <rect class="c-body leg" x="3" y="8" width="1" height="2"/>
+        <rect class="c-body leg" x="8" y="8" width="1" height="2"/>
+        <rect class="c-body leg" x="10" y="8" width="1" height="2"/>
+        <g id="torso">
+          <rect class="c-body" id="armL" x="-2" y="4" width="2" height="2"/>
+          <rect class="c-body" id="armR" x="12" y="4" width="2" height="2"/>
+          <rect class="c-body" id="body" x="0" y="0" width="12" height="8"/>
+          <rect class="c-eye" id="eyeL" x="2" y="2" width=".9" height="2"/>
+          <rect class="c-eye" id="eyeR" x="9.1" y="2" width=".9" height="2"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="bubble" id="bubble" aria-live="polite"></div>
+  <div id="menu" role="menu" hidden></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const root = document.documentElement;
+
+  function pix(rows, map){
+    const h = rows.length, w = rows[0].length; let r = '';
+    rows.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(map[ch]) r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" style="fill:${map[ch]}"/>`; }));
+    return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${r}</svg>`;
+  }
+  const HEART = pix(['.XX.XX.','XXXXXXX','XXXXXXX','.XXXXX.','..XXX..','...X...'],{X:'var(--heart)'});
+  const COOKIE = pix(['.XXXX.','XXoXXX','XXXXoX','XoXXXX','XXXoXX','.XXXX.'],{X:'var(--cookie)',o:'var(--chip)'});
+  const ZED = pix(['XXXX','..X.','.X..','XXXX'],{X:'var(--muted)'});
+  const NOTE = pix(['..XXX','..X.X','..X..','XXX..','XXX..'],{X:'var(--muted)'});
+  const BALL = pix(['.XXXX.','XwXXXX','wXXXXX','XXXXXX','XXXXXX','.XXXX.'],{X:'var(--ball)',w:'var(--shine)'});
+
+  const stage = $('stage'), el = $('clawd'), shadow = $('shadow'), bubble = $('bubble'), menu = $('menu');
+  const P = { squash:$('squash'), torso:$('torso'), armL:$('armL'), armR:$('armR'), eyeL:$('eyeL'), eyeR:$('eyeR'), legs:[...el.querySelectorAll('.leg')] };
+
+  // ---------- settings & state ----------
+  const SIZES = { S:5, M:7, L:9.5 };
+  const COLORS = { Clay:'#D77757', Sand:'#C9A27A', Ink:'#5B6470' };
+  const prefs = { size:'M', color:'Clay', stay:false };
+  let stats = { energy:80, food:70, joy:70 }, lastSeen = 0;
+  try {
+    const s = JSON.parse(localStorage.getItem('desk-clawd') || 'null');
+    if (s){ ['energy','food','joy'].forEach(k => { if (typeof s[k]==='number') stats[k] = clamp(s[k],0,100); }); lastSeen = s.seen||0;
+      if (SIZES[s.size]) prefs.size = s.size; if (COLORS[s.color]) prefs.color = s.color; prefs.stay = !!s.stay; }
+  } catch(e){}
+  // Time keeps passing while the app is closed: after a long absence Clawd is rested, a bit peckish, and glad to see you.
+  const closedSec = lastSeen ? clamp((Date.now() - lastSeen)/1000, 0, 24*3600) : 0;
+  if (closedSec > 60){
+    stats.food = Math.max(0, stats.food - closedSec*.004);
+    stats.joy = Math.max(0, stats.joy - closedSec*.002);
+    if (closedSec > 600) stats.energy = 100;
+  }
+  if (closedSec > 600) stats.joy = Math.min(100, stats.joy + 15);
+  function save(){ try { localStorage.setItem('desk-clawd', JSON.stringify({...stats, ...prefs, seen:Date.now()})); } catch(e){} }
+  setInterval(save, 5000); document.addEventListener('visibilitychange', save);
+  function applyColor(){ root.style.setProperty('--clawd', COLORS[prefs.color]); }
+  applyColor();
+
+  // Needs drain slowly: a full Clawd gets hungry over about an hour and a quarter, not twenty minutes.
+  const RATE = { food:.022, joy:.012, energy:.025, chase:.5, sleep:1.4 };
+
+  const S = { x:0, y:0, vx:0, vy:0, state:'idle', stateT:0, t:0, wait:1.5, tx:0, blinkAt:2, blinkT:0, squashT:0, lastZ:0,
+              lookX:0, lookY:0, kickCD:0, chaseCD:0, target:null, moveDir:1,
+              on:null, ignorePlat:null, jumping:false, then:null, hopDir:1, climb:null, userAway:false,
+              exitDir:1, goneFor:0, waveCD:20, thinkAt:30, noteAt:0, rideSaid:-99 };
+  let mode = 'page';   // 'page' | 'gate' | 'overlay'
+  let wake = () => {}; // replaced by the frame loop below
+  let W=0, H=0, u=7, SW=126, SH=88, floorY=0;
+  const pointer = { x:-1e4, y:-1e4, t:-99 };
+  const snacks = []; let ball = null;
+
+  // ---------- where Clawd can stand ----------
+  // The floor, plus the visible top edges of your windows (sent by the native app).
+  let rawPlatforms = [], platforms = [];
+  const OFFSTAGE = new Set(['exit','gone','enter']);
+  const surfaceY = () => S.on ? S.on.y : floorY;
+  const groundY = () => surfaceY() - 12*u;
+  const feetY = () => S.y + 12*u;
+  const center = () => S.x + 9*u;
+  const xMin = () => S.on ? Math.max(0, S.on.x1 - 7*u) : 0;
+  const xMax = () => S.on ? Math.min(W - SW, S.on.x2 - 11*u) : Math.max(0, W-SW);
+  function filterPlatforms(){
+    platforms = rawPlatforms
+      .map(p => ({ id:p.id, wx:p.wx, y:p.y, x1:Math.max(0, p.x1), x2:Math.min(W, p.x2) }))
+      .filter(p => p.x2 - p.x1 >= 18*u && p.y - SH - 8 > 0 && p.y < floorY - 8*u);
+  }
+  function measure(){
+    W = stage.clientWidth; H = stage.clientHeight;
+    u = SIZES[prefs.size]; SW = 18*u; SH = 12.5*u; floorY = H - (mode==='overlay' ? 1 : 6);
+    el.style.width = SW+'px'; el.style.height = SH+'px';
+    filterPlatforms();
+    if (S.on){ const c = center(), id = S.on.id; S.on = platforms.find(p => p.id===id && c >= p.x1 && c <= p.x2) || null; }
+    if (!OFFSTAGE.has(S.state)) S.x = clamp(S.x, xMin(), xMax());
+    if (S.state!=='held' && S.state!=='fall') S.y = groundY();
+    snacks.forEach(s => { s.size = 3.2*u; s.x = clamp(s.x, 0, W-s.size); if (s.landed) s.y = floorY - s.size; });
+    if (ball){ ball.size = 3.4*u; ball.x = clamp(ball.x, 0, W-ball.size); ball.y = Math.min(ball.y, floorY-ball.size); }
+  }
+  new ResizeObserver(measure).observe(stage);
+  measure(); S.x = W*.62; S.y = groundY();
+
+  function setPlatforms(list){
+    rawPlatforms = Array.isArray(list) ? list : [];
+    filterPlatforms();
+    if (!S.on) return;
+    const old = S.on, same = platforms.filter(p => p.id === old.id);
+    const dx = same.length ? same[0].wx - old.wx : 0, dy = same.length ? same[0].y - old.y : 0;
+    const c = center() + dx, seg = same.find(p => c >= p.x1 + u && c <= p.x2 - u);
+    if (!seg){
+      S.on = null;
+      if (S.state === 'held') return;
+      say(same.length ? pick(['Whoa!','Slipped!','Hey, the edge moved!']) : pick(['Hey! I was standing on that!','Where did my window go?','Window closed. Rude.']), 2200);
+      go('fall', { vx:0, vy:0 });
+      return;
+    }
+    S.on = seg; S.x += dx; S.tx += dx;
+    if (S.state !== 'held' && S.state !== 'fall') S.y = groundY();
+    if ((Math.abs(dx) > 40 || Math.abs(dy) > 40) && S.t - S.rideSaid > 10){ S.rideSaid = S.t; say(pick(['Wheee, a ride!','Where are we going?','Moving day!']), 1600); }
+    wake();
+  }
+
+  // ---------- speech & effects ----------
+  let bubbleTimer = 0;
+  const recent = [];
+  function fresh(list){ const pool = list.filter(l => !recent.includes(l)); const l = pick(pool.length ? pool : list); recent.push(l); if (recent.length > 12) recent.shift(); return l; }
+  function say(text, ms, icon){
+    bubble.textContent = '';
+    if (icon){ const i = document.createElement('span'); i.className = 'ico'; i.innerHTML = icon; bubble.appendChild(i); }
+    bubble.appendChild(document.createTextNode(text));
+    bubble.classList.add('on'); wake();
+    clearTimeout(bubbleTimer); bubbleTimer = setTimeout(()=>bubble.classList.remove('on'), ms || 2600 + text.length*35);
+  }
+  const QUIPS = ['*clack clack*','Thinking…','Ship it!','Tests are green in my heart.','Hydrate, human.','Sideways is just forward with style.',
+    'Nice cursor.','You\'re doing great.','One more commit, then a walk?','I read the docs so you don\'t have to.','Stretch break?',
+    'Is that a semicolon or a typo?','I tidied the bottom of your screen.','Pixel art is a lifestyle.','Did you save that file?',
+    'Plot twist: it was a caching issue.','Have you tried turning it off and on again?','Deep breath in… and out.','Looking sharp today.',
+    'I wonder what\'s behind that window.','Small steps. Sideways steps.','Fun fact: crabs walk sideways. I walk however I like.',
+    'Your desktop has great vibes.','Remember to blink. I just did.','I\'m not procrastinating, I\'m pacing.'];
+  const NIGHT = ['It\'s late… still working?','Bedtime was a while ago.','The pixels are getting sleepy.','Night owl mode: on.','*yawn*'];
+  const MORNING = ['Morning! Coffee first?','Fresh day, fresh bugs.','Rise and grind. Gently.'];
+  const LUNCH = ['Lunch time? I\'ll have a cookie.','Don\'t skip lunch!'];
+  const EVENING = ['Almost done for the day?','Evening already!','Golden hour. Very cinematic.'];
+  const PERCH = ['Nice view up here.','I can see my house from here.','This window is comfy.','Don\'t close this one, okay?','King of the window!'];
+  const PET = ['Hehe!','More please.','Best human.','*happy crab noises*','That\'s the spot.','Again!','You have nice hands. Cursor. Whatever.'];
+  const NOM = ['Nom nom.','Crunchy!','Tastes like chocolate chips.','Thank you!','Best snack ever.'];
+  const RETURN = ['I\'m back! Saw a really nice folder.','Back! The other side of the screen is wild.','Did you miss me?','Explored the edges. All clear.'];
+  const APP_TALK = [
+    [/claude|anthropic/i, ['Oh hey, it\'s my people!','Tell Claude I said hi.']],
+    [/xcode|vscode|visualstudio|jetbrains|cursor|\bzed\b|sublime|\bnova\b|bbedit|vim/i, ['Coding time! I\'ll supervise.','Remember to commit.','Ooh, code. Can I watch?']],
+    [/terminal|iterm|warp|ghostty|kitty|alacritty|wezterm/i, ['Terminal time. Type fast, type true.','Careful with rm -rf.','Hacker mode!']],
+    [/spotify|\bmusic\b|tidal|deezer/i, ['Is that music? Dance break!']],
+    [/safari|chrome|firefox|\barc\b|thebrowser|brave|\bedge\b|helium|orion|vivaldi|\bopera\b/i, ['What are we reading?','Don\'t forget to close some tabs.','Browsing? Find me a cookie.']],
+    [/slack|discord|messages|telegram|whatsapp|signal/i, ['Say hi from me!','Tell them Clawd says hello.']],
+    [/\bmail\b|outlook|readdle\.spark|mimestream|superhuman/i, ['Inbox zero? I believe in you.','Emails… brave.']],
+    [/zoom\.us|facetime|\bmeet\b|\bteams\b|webex/i, ['Meeting? I\'ll be quiet. Mostly.']],
+    [/\bnotes\b|obsidian|notion|\bbear\b|\bcraft\b|\bpages\b|\bword\b/i, ['Writing something? Ooh.','Make it a good one.']],
+    [/figma|sketch|photoshop|pixelmator|affinity|illustrator/i, ['Make it pretty!','Needs more pixel crabs.']],
+    [/\bfinder\b/i, ['So many folders.','Looking for something?']],
+    [/\bical\b|\bcalendar\b|fantastical/i, ['Anything fun scheduled?']]
+  ];
+  function quip(){
+    const h = new Date().getHours();
+    if (S.on && Math.random() < .5) return fresh(PERCH);
+    if ((h >= 23 || h < 5) && Math.random() < .5) return fresh(NIGHT);
+    if (h >= 6 && h < 10 && Math.random() < .3) return fresh(MORNING);
+    if (h >= 12 && h < 14 && Math.random() < .25) return fresh(LUNCH);
+    if (h >= 18 && h < 21 && Math.random() < .25) return fresh(EVENING);
+    return fresh(QUIPS);
+  }
+  function fx(cls, html, x, y, dx){
+    const d = document.createElement('div'); d.className = 'fx '+cls; d.innerHTML = html||'';
+    d.style.left = x+'px'; d.style.top = y+'px'; if (dx!=null) d.style.setProperty('--dx', dx+'px');
+    stage.appendChild(d); d.addEventListener('animationend', ()=>d.remove()); return d;
+  }
+  function hearts(n){ for (let i=0;i<n;i++) setTimeout(()=>{ const h = fx('', HEART, center()+rand(-3,3)*u, S.y+rand(-1,1)*u, rand(-30,30)); h.style.width=h.style.height=(2.2*u)+'px'; }, i*120); }
+  // A small thought when a need runs low, so you can see what Clawd wants.
+  function think(){
+    if (bubble.classList.contains('on')) return;
+    if (stats.food < 30) say(stats.food < 10 ? 'So hungry…' : 'Snack?', 3000, COOKIE);
+    else if (stats.energy < 25) say('Sleepy…', 3000, ZED);
+    else if (stats.joy < 30) say('Pet me?', 3000, HEART);
+  }
+
+  // ---------- objects ----------
+  function makeObj(html, cls){ const d = document.createElement('div'); d.className = 'obj '+cls; d.innerHTML = html; stage.appendChild(d); return d; }
+  function dropSnack(atX){
+    if (snacks.length >= 3){ say('I still have snacks down here!'); return; }
+    const size = 3.2*u, x = atX!=null ? clamp(atX - size/2, 0, W-size) : clamp(center() + rand(-25,25)*u, 0, W-size);
+    snacks.push({ el:makeObj(COOKIE,'snack'), x, y:-size, vy:0, size, landed:false }); comeBack(); wake();
+  }
+  function throwBall(){
+    if (ball) ball.el.remove();
+    const size = 3.4*u, fromLeft = center() > W/2;
+    ball = { el:makeObj(BALL,'ball'), x: fromLeft ? center() - 30*u : center() + 30*u, y: floorY - 30*u, vx:(fromLeft?1:-1)*rand(20,35)*u, vy:-rand(15,30)*u, size, idle:0 };
+    ball.x = clamp(ball.x, 0, W-size); comeBack(); wake();
+    ball.el.addEventListener('pointerdown', e => { e.stopPropagation(); ball.vy = -rand(55,75)*u; ball.vx = rand(-30,30)*u; ball.idle = 0; });
+    if (S.state==='sleep') say('Mm… ball… later…');
+  }
+
+  // ---------- behaviour ----------
+  const BUSY = new Set(['held','fall','crouch','exit','gone','enter']);
+  const awake = () => !BUSY.has(S.state) && S.state !== 'sleep';
+  function go(state, opts){
+    S.state = state; S.stateT = 0; S.userAway = false; S.jumping = false; S.then = null;
+    Object.assign(S, opts||{});
+    if (state==='idle') S.wait = rand(1.5, 4.5);
+    if (state==='sit') S.wait = rand(4, 10);
+    if (state==='walk' && !(opts && 'tx' in opts)) S.tx = clamp(S.x + rand(-40,40)*u, xMin(), xMax());
+    wake();
+  }
+  function comeBack(){ if (S.state === 'gone') S.stateT = S.goneFor; }
+  function landedSnack(){ let best=null, bd=1e9; snacks.forEach(s=>{ if(!s.landed) return; const d=Math.abs(s.x+s.size/2-center()); if(d<bd){bd=d;best=s;} }); return best; }
+  function interrupts(){
+    const s = landedSnack(), wantSnack = s && stats.food < 96, wantBall = ball && stats.energy > 15 && S.chaseCD <= 0;
+    if (!wantSnack && !wantBall) return false;
+    const tx = wantSnack ? s.x + s.size/2 : ball.x + ball.size/2;
+    if (S.on){ hopDown(tx > center() ? 1 : -1); return true; }
+    if (wantSnack) go('seek', {target:s}); else go('chase');
+    return true;
+  }
+  function hopDown(dir){
+    S.ignorePlat = S.on ? S.on.id : null; S.on = null;
+    say(pick(['Coming down!','Geronimo!','Hup!']), 1200);
+    go('fall', { vx: dir*rand(8,14)*u, vy: -rand(25,35)*u });
+  }
+  const reachable = () => platforms.filter(p => p.id !== (S.on && S.on.id) && p.y < surfaceY() - 14*u);
+  function planClimb(){
+    const opts = reachable(); if (!opts.length) return false;
+    const p = pick(opts), cx = rand(p.x1 + 5*u, p.x2 - 5*u);
+    S.climb = { id:p.id, cx };
+    if (Math.random() < .5) say(pick(['Ooh, a window. Going up!','I bet the view is better up there.','Watch this.']), 1800);
+    go('walk', { tx: clamp(cx - 9*u, xMin(), xMax()), then:'crouch' });
+    return true;
+  }
+  function launch(){
+    const c = S.climb, p = c && (platforms.find(q => q.id === c.id && c.cx >= q.x1 && c.cx <= q.x2) || platforms.find(q => q.id === c.id));
+    if (!p){ say('Huh, it moved.'); go('idle'); return; }
+    const g = 180*u, tx = clamp(c.cx, p.x1 + 4*u, p.x2 - 4*u) - 9*u, ty = p.y - 12*u;
+    const peak = Math.min(S.y, ty) - 5*u;
+    const vy = -Math.sqrt(2*g*(S.y - peak)), T = -vy/g + Math.sqrt(2*(ty - peak)/g);
+    S.ignorePlat = S.on ? S.on.id : null; S.on = null;
+    say(pick(['Hup!','Up we go!','Parkour!']), 1000);
+    go('fall', { vx:(tx - S.x)/T, vy, jumping:true });
+  }
+  function planExit(){
+    say(pick(['Gonna stretch my legs.','Brb, exploring.','I\'ll be right back.']), 1800);
+    go('exit', { exitDir: center() < W/2 ? -1 : 1 });
+  }
+  function landed(){
+    const hard = S.vy > 70*u;
+    S.y = groundY(); S.vx = S.vy = 0; S.squashT = .25; S.ignorePlat = null;
+    if (S.on){ if (Math.random() < .6) say(pick(['Made it!','Ta-da!','Nailed it.', ...PERCH]), 1800); }
+    else if (hard) say(pick(['Oof!','Nailed the landing.','Whoa!']));
+    go('idle');
+  }
+  function weighted(table){
+    let r = Math.random() * table.reduce((a, [,w]) => a + w, 0);
+    for (const [k, w] of table){ if ((r -= w) < 0) return k; }
+    return 'idle';
+  }
+  function decide(){
+    if (interrupts()) return;
+    if (userIdle >= 150){ go('sleep', { userAway:true }); return; }
+    const h = new Date().getHours(), night = h >= 23 || h < 5;
+    if (stats.energy < 12 || (night && stats.energy < 35 && Math.random() < .3)){ say(pick(['So… sleepy…','*yawn* Nap time.'])); go('sleep'); return; }
+    if (stats.food < 20 && Math.random() < .3){ say(stats.food < 8 ? 'So hungry…' : 'Is it snack o\'clock?', 2800, COOKIE); go('idle'); return; }
+    const roam = !prefs.stay, happy = stats.joy > 60 ? 6 : 0;
+    const choice = weighted(S.on ? [
+      ['walk', roam ? 30 : 0], ['hopdown', roam ? 12 : 0], ['sit', 14], ['look', 10], ['quip', 10], ['stretch', 5], ['dance', happy], ['idle', 14]
+    ] : [
+      ['walk', roam ? 28 : 0], ['climb', roam && stats.energy > 30 && reachable().length ? 16 : 0], ['exit', roam ? 3 : 0],
+      ['sit', 9], ['look', 8], ['stretch', 6], ['quip', 11], ['dance', happy], ['happy', 4], ['idle', 12]
+    ]);
+    switch (choice){
+      case 'walk': go('walk'); break;
+      case 'hopdown': { const left = Math.random() < .5; go('walk', { tx: left ? xMin() : xMax(), then:'hopdown', hopDir: left ? -1 : 1 }); break; }
+      case 'climb': if (!planClimb()) go('idle'); break;
+      case 'exit': planExit(); break;
+      case 'quip': say(quip()); go('idle'); break;
+      case 'look': if (Math.random() < .3) say(pick(['Hm?','What was that?','…'])); go('look'); break;
+      case 'stretch': if (Math.random() < .3) say(pick(['Stretch!','Mmmmh.'])); go('stretch'); break;
+      case 'dance': say(pick(['Dance break!','♪ ♪','Got the moves.']), 1600); go('dance'); break;
+      default: go(choice);
+    }
+  }
+  function moveToward(tx, speed, dt){
+    const dx = tx - S.x;
+    if (Math.abs(dx) < 2) return true;
+    S.moveDir = Math.sign(dx);
+    S.x = clamp(S.x + clamp(dx, -speed*dt, speed*dt), xMin(), xMax());
+    return Math.abs(tx - S.x) < 2 || (S.x === xMin() && tx < S.x) || (S.x === xMax() && tx > S.x);
+  }
+  // Wave back when the cursor comes close.
+  function maybeWave(){
+    if (S.t < S.waveCD || S.t - pointer.t > 1.5) return false;
+    if (Math.hypot(pointer.x - center(), pointer.y - (S.y + 4*u)) > 28*u) return false;
+    S.waveCD = S.t + rand(30, 60);
+    say(pick(['Hi!','Oh hey!','*waves*','Hello, cursor.']), 1300); go('wave');
+    return true;
+  }
+
+  // ---------- what Clawd knows about you (native app only) ----------
+  let userIdle = 0, awaySince = 0, activeSec = 0, nextBreak = 3600, helloSaid = false;
+  const appSaid = {}; let lastAppTalk = -1e9;
+  function welcomeBack(mins){
+    if (mins < 5) return 'Oh hi! That was quick.';
+    if (mins < 60) return `Welcome back! You were gone ${mins} minutes.`;
+    if (mins < 300) { const h = Math.round(mins/6)/10; return `There you are! ${h} hours. I kept your seat warm.`; }
+    return 'You\'re back! I missed you.';
+  }
+  function onIdle(sec){
+    userIdle = sec;
+    if (sec < 60) activeSec += 1;
+    if (sec >= 45 && !helloSaid && !awaySince && awake()){ helloSaid = true; say(pick(['Hello? Anyone there?','…psst.','Did you get a snack without me?'])); }
+    if (sec >= 150 && !awaySince){
+      awaySince = Date.now() - sec*1000;
+      comeBack();
+      if (awake()){ say(pick(['I\'ll just rest my eyes…','Guarding the desk. Zzz.'])); go('sleep', { userAway:true }); }
+    }
+    if (sec < 2){
+      helloSaid = false;
+      if (awaySince){
+        const mins = Math.round((Date.now() - awaySince)/60000); awaySince = 0;
+        stats.joy = Math.min(100, stats.joy + 12);
+        if (S.state === 'sleep' || awake()){ go('happy'); hearts(2); say(welcomeBack(mins), 3400); }
+      }
+    }
+    if (activeSec >= nextBreak){
+      const h = Math.round(activeSec/3600); nextBreak += 3600;
+      if (awake()){ say(h === 1 ? 'You\'ve been at it an hour. Stretch with me?' : `${h} hours of work! Stretch break?`, 4000); go('stretch'); }
+    }
+  }
+  function onApp(id, name){
+    const key = id || name; if (!key || !awake()) return;
+    const hit = APP_TALK.find(([re]) => re.test(id) || re.test(name)); if (!hit) return;
+    if (S.t - lastAppTalk < 150 || S.t - (appSaid[key] ?? -1e9) < 1800 || Math.random() < .35) return;
+    lastAppTalk = S.t; appSaid[key] = S.t;
+    const line = pick(hit[1]); say(line, 2800);
+    if (/dance/i.test(line)) go('dance');
+  }
+
+  // ---------- what Clawd sees of the interface (Accessibility, native app only) ----------
+  // Only reactions happen here: nothing is stored, and nothing leaves the page.
+  let keyIdle = 99, typingField = null, pwFocus = false;
+  const uiSaid = {}, lastUiTalk = {};
+  // Window-title chatter and direct reactions (search, dialogs, risky buttons) keep separate quiet periods,
+  // so a comment about a title never swallows a reaction to something you just did.
+  function uiTalk(key, line, minGap, perKey, ms){
+    const kind = key.startsWith('win:') ? 'win' : 'react';
+    if (!awake() || S.t - (lastUiTalk[kind] ?? -1e9) < minGap || S.t - (uiSaid[key] ?? -1e9) < perKey) return false;
+    lastUiTalk[kind] = S.t; uiSaid[key] = S.t; say(line, ms || 3000); return true;
+  }
+  function lookAt(r, secs){ if (r) { S.lookAt = { x: r[0] + r[2]/2, y: r[1] + r[3]/2, until: S.t + secs }; wake(); } }
+  const FILE_RE = /[\w.-]+\.(swift|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|kt|c|cc|cpp|h|m|cs|php|html|css|scss|md|json|ya?ml|toml|sh|sql|txt|csv)\b/i;
+  function onUi(e){
+    if (!e || typeof e !== 'object') return;
+    switch (e.type){
+      case 'status':
+        if (!e.trusted && !localStorage.getItem('desk-clawd-asked-ui')){
+          localStorage.setItem('desk-clawd-asked-ui', '1');
+          setTimeout(() => { if (awake()) say('Want me to notice dialogs and buttons? Menu bar icon → Let Clawd See the Interface.', 7000); }, 9000);
+        }
+        break;
+      case 'granted':
+        go('happy'); hearts(3); say('I can see now! So many buttons.', 3500);
+        break;
+      case 'focus': {
+        const was = pwFocus;
+        pwFocus = e.kind === 'password';
+        typingField = (e.kind === 'text' || e.kind === 'search') ? e.rect || [center(), S.y, 1, 1] : null;
+        if (pwFocus && !was && (awake() || S.state === 'sleep')){ say(pick(['I\'m not looking!','Eyes closed, promise.','La la la, not looking.']), 2200); go('cover'); break; }
+        if (!pwFocus && S.state === 'cover'){ say(pick(['Okay, I can look again.','All clear?']), 1400); go('idle'); }
+        if (e.kind === 'search'){ lookAt(e.rect, 3); uiTalk('search', pick(['What are we looking for?','Search away!','Find me a cookie while you\'re at it.']), 20, 900); }
+        else if (e.kind === 'text'){ lookAt(e.rect, 2); }
+        break;
+      }
+      case 'dialog': {
+        const t = [e.title, e.text, ...(e.buttons || [])].join(' ').toLowerCase();
+        let line;
+        if (/error|failed|couldn.t|can.t be|cannot|unable|problem|went wrong|not responding/.test(t)) line = pick(['Uh oh. That doesn\'t look good.','An error? I\'m right here.','Oh no. Deep breaths.']);
+        else if (/unsaved|save changes|don.t save|want to save/.test(t)) line = pick(['Don\'t lose your work!','Save it! Save it!']);
+        else if (/delete|remove|trash|erase|permanently|can.t be undone/.test(t)) line = pick(['Careful with that one.','Are we sure about this?']);
+        else if (/allow|access|permission|would like to|wants to/.test(t)) line = pick(['Read it before you click Allow!','Permissions… choose wisely.']);
+        else if (/update|install|restart|upgrade/.test(t)) line = pick(['Ooh, updates.','Restart later? I won\'t tell.']);
+        else if (/\bquit\b|close/.test(t)) line = 'Leaving already?';
+        else line = pick(['A dialog! Exciting.','Ooh, a pop-up.','Something wants your attention.']);
+        lookAt(e.rect, 4);
+        if (uiTalk('dialog', line, 15, 20)) go('alert');
+        break;
+      }
+      case 'window': {
+        const title = String(e.title || '').trim(), low = title.toLowerCase();
+        if (!title || Math.random() < .5) break;
+        const inbox = title.match(/inbox\s*\((\d+)\)/i), file = title.match(FILE_RE);
+        let line = null;
+        if (inbox) line = +inbox[1] > 50 ? `${inbox[1]} unread? Oof.` : `${inbox[1]} unread. You've got this.`;
+        else if (/\b(tests?|spec)\b/.test(low)) line = 'Tests! May they all be green.';
+        else if (/error|exception|traceback|crash/.test(low)) line = 'Debugging? I\'ll hold the flashlight.';
+        else if (/pull request|merge request|\bpr\b|github|gitlab/.test(low)) line = 'Shipping something?';
+        else if (/youtube|netflix|twitch/.test(low)) line = 'Video break? I\'ll watch too.';
+        else if (/readme/.test(low)) line = 'Writing docs? Respect.';
+        else if (file) line = pick([`How's ${file[0]} going?`, `Ooh, ${file[0]}.`, `${file[0]}? Looks important.`]);
+        if (line) uiTalk('win:' + title, line, 150, 1800);
+        break;
+      }
+      case 'hover': {
+        const label = String(e.label || '').toLowerCase(), key = 'hover:' + label;
+        if (/delete|remove|erase|discard|uninstall|empty trash|reset|force quit|format|destroy/.test(label)){ if (uiTalk(key, pick(['Careful!','Whoa, careful with that one.','Are you sure?']), 20, 300, 1800)) go('alert'); }
+        else if (/\b(buy|purchase|subscribe|checkout|pay|order)\b/.test(label)) uiTalk(key, pick(['Spending money?','Treat yourself. Or don\'t.']), 20, 300, 1800);
+        else if (/\b(send|publish|post|submit|merge|deploy)\b/.test(label)) uiTalk(key, pick(['Double-check first!','Big button. Big moment.']), 20, 300, 1800);
+        break;
+      }
+    }
+  }
+
+  let frameDt = 1/60;
+  function update(dt){
+    frameDt = dt; S.t += dt; S.stateT += dt; S.kickCD -= dt; S.chaseCD -= dt;
+    const h = S.t > (S.hourAt||0) ? (S.hourAt = S.t + 30, S.hour = new Date().getHours()) : S.hour;
+    const night = h >= 23 || h < 5, away = S.userAway ? .3 : 1;
+    if (S.state==='sleep') stats.energy = Math.min(100, stats.energy + RATE.sleep*dt);
+    else stats.energy = Math.max(0, stats.energy - (S.state==='chase' ? RATE.chase : RATE.energy*(night ? 1.6 : 1))*dt);
+    stats.food = Math.max(0, stats.food - RATE.food*away*dt); stats.joy = Math.max(0, stats.joy - RATE.joy*away*dt);
+    if (awake() && S.t > S.thinkAt){ S.thinkAt = S.t + rand(30, 50); think(); }
+
+    switch (S.state){
+      case 'idle':
+        if (S.stateT > .4 && (interrupts() || maybeWave())) break;
+        if (S.stateT > .4 && typingField && keyIdle < 1.5){ go('type'); break; }
+        if (S.stateT > S.wait) decide();
+        break;
+      case 'sit': case 'look':
+        if (interrupts() || maybeWave()) break;
+        if (S.stateT > (S.state==='look' ? 2.6 : S.wait)) go('idle');
+        break;
+      case 'stretch': if (S.stateT > 1.8) go('idle'); break;
+      case 'type':
+        if (interrupts()) break;
+        if (keyIdle > 2.5 || !typingField || S.stateT > 40) go('idle');
+        else if (Math.random() < dt*.04) say(pick(['*clack clack*','Typing along!','Tap tap tap.']), 1300);
+        break;
+      case 'alert': if (S.stateT > 1.4) go('idle'); break;
+      case 'cover':
+        if (!pwFocus || S.stateT > 45){ say(pick(['Okay, I can look again.','All clear?']), 1400); go('idle'); }
+        break;
+      case 'wave': if (S.stateT > 1.6) go('idle'); break;
+      case 'dance':
+        if (S.t > S.noteAt){ S.noteAt = S.t + .45; const n = fx('z', NOTE, center() + rand(-6,6)*u, S.y, rand(-20,20)); n.style.width = n.style.height = 1.6*u+'px'; }
+        if (S.stateT > 3.2){ stats.joy = Math.min(100, stats.joy + 3); go('idle'); }
+        break;
+      case 'walk':
+        if (interrupts()) break;
+        if (moveToward(S.tx, 9*u, dt)){
+          if (S.then === 'crouch') go('crouch');
+          else if (S.then === 'hopdown') hopDown(S.hopDir);
+          else go('idle');
+        }
+        break;
+      case 'crouch': if (S.stateT > .35) launch(); break;
+      case 'seek': {
+        const s = S.target; if (!snacks.includes(s)){ go('idle'); break; }
+        if (moveToward(clamp(s.x + s.size/2 - 9*u, 0, W-SW), 12*u, dt)) go('eat', {target:s});
+        break;
+      }
+      case 'eat':
+        if (Math.random() < dt*6) fx('crumb','', center()+rand(-2,2)*u, S.y+9*u, rand(-14,14));
+        if (S.stateT > 1.6){
+          const i = snacks.indexOf(S.target); if (i>=0){ snacks[i].el.remove(); snacks.splice(i,1); }
+          stats.food = Math.min(100, stats.food+28); stats.joy = Math.min(100, stats.joy+5); say(fresh(NOM)); go('idle');
+        }
+        break;
+      case 'chase': {
+        if (!ball){ go('idle'); break; }
+        if (stats.energy < 12){ say('I\'m pooped.'); S.chaseCD = 20; go('idle'); break; }
+        const bc = ball.x + ball.size/2;
+        moveToward(clamp(bc - 9*u, 0, W-SW), 17*u, dt);
+        if (Math.abs(bc - center()) < 7*u && ball.y + ball.size > floorY - 5*u && S.kickCD <= 0){
+          const dir = Math.sign(bc - center()) || (Math.random()<.5?-1:1);
+          ball.vx = dir*rand(30,50)*u; ball.vy = -rand(35,55)*u; ball.idle = 0;
+          S.kickCD = .8; stats.joy = Math.min(100, stats.joy+4); stats.energy -= 1.5;
+          if (Math.random()<.25) say(pick(['Boop!','Gotcha!','Wheee!','Again!']), 1400);
+        }
+        if (S.stateT > 14){ S.chaseCD = 12; say('Okay, ball break.'); go('idle'); }
+        break;
+      }
+      case 'sleep':
+        if (S.t - S.lastZ > 1.3){ S.lastZ = S.t; const z = fx('z', ZED, S.x+13*u, S.y+u, rand(10,30)); z.style.width = z.style.height = (1+Math.random()*.6)*u+'px'; }
+        if (stats.energy >= 100 && !S.userAway){ say('Good nap!'); go('idle'); }
+        break;
+      case 'happy': if (S.stateT > 1.0) go('idle'); break;
+      case 'held': break;
+      case 'fall': {
+        const prevFeet = feetY();
+        S.vy += 180*u*dt; S.x += S.vx*dt; S.y += S.vy*dt; if (!S.jumping) S.vx *= (1 - 1.5*dt);
+        if (S.x < 0){ S.x = 0; S.vx = Math.abs(S.vx)*.5; }
+        if (S.x > W-SW){ S.x = W-SW; S.vx = -Math.abs(S.vx)*.5; }
+        if (S.vy > 0){
+          const c = center(), f = feetY();
+          const land = platforms.find(p => p.id !== S.ignorePlat && prevFeet <= p.y + 2 && f >= p.y && c >= p.x1 + u && c <= p.x2 - u);
+          if (land){ S.on = land; landed(); break; }
+        }
+        if (S.y >= floorY - 12*u){ S.on = null; landed(); }
+        break;
+      }
+      case 'exit':
+        S.moveDir = S.exitDir; S.x += S.exitDir*9*u*dt;
+        if (S.exitDir < 0 ? S.x <= -SW - 2*u : S.x >= W + 2*u) go('gone', { goneFor: rand(15, 45) });
+        break;
+      case 'gone':
+        if (S.stateT > S.goneFor){
+          const from = Math.random() < .5 ? -1 : 1;
+          S.x = from < 0 ? -SW : W; S.on = null; S.y = groundY();
+          go('enter', { exitDir: -from, tx: clamp(W*rand(.2, .8), 0, W-SW) });
+        }
+        break;
+      case 'enter':
+        S.moveDir = S.exitDir; S.x += S.exitDir*9*u*dt;
+        if (S.exitDir > 0 ? S.x >= S.tx : S.x <= S.tx){ S.x = S.tx; say(fresh(RETURN)); go('idle'); }
+        break;
+    }
+    S.squashT = Math.max(0, S.squashT - dt);
+
+    snacks.forEach(s => { if (s.landed) return; s.vy += 150*u*dt; s.y += s.vy*dt; if (s.y >= floorY - s.size){ s.y = floorY - s.size; s.landed = true; } });
+    if (ball){
+      const b = ball;
+      b.vy += 150*u*dt; b.x += b.vx*dt; b.y += b.vy*dt;
+      if (b.x < 0){ b.x = 0; b.vx = Math.abs(b.vx)*.8; }
+      if (b.x > W-b.size){ b.x = W-b.size; b.vx = -Math.abs(b.vx)*.8; }
+      if (b.y < 0 && b.vy < 0){ b.vy = Math.abs(b.vy)*.3; }
+      if (b.y >= floorY - b.size){ b.y = floorY - b.size; b.vy = Math.abs(b.vy) > 12*u ? -Math.abs(b.vy)*.55 : 0; b.vx *= (1 - 2.2*dt); }
+      if (Math.abs(b.vx) < 3*u && b.vy===0) b.idle += dt; else b.idle = 0;
+      if (b.idle > 25 && S.state!=='chase'){ b.el.remove(); ball = null; }
+    }
+    if (S.t > S.blinkAt){ S.blinkT = .12; S.blinkAt = S.t + rand(2.5, 6); }
+    S.blinkT = Math.max(0, S.blinkT - dt);
+  }
+
+  // ---------- render ----------
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function setA(n, a, v){ if (n['_'+a] !== v){ n['_'+a] = v; n.setAttribute(a, v); } }
+  const f3 = v => +v.toFixed(3);
+  function setR(r, x, y, w, h){ setA(r,'x',f3(x)); setA(r,'y',f3(y)); setA(r,'width',f3(w)); setA(r,'height',f3(h)); }
+  let hopY = 0;
+  function render(){
+    const st = S.state, t = S.t;
+    hopY = st==='happy' ? -Math.abs(Math.sin(S.stateT*Math.PI*3))*2.2*u
+         : st==='dance' && !reduce ? -Math.abs(Math.sin(S.stateT*Math.PI*2.5))*1.4*u
+         : st==='alert' && S.stateT < .33 ? -Math.sin(S.stateT/.33*Math.PI)*1.6*u : 0;
+    const hidden = st === 'gone';
+    if (el._hidden !== hidden){ el._hidden = hidden; el.style.visibility = shadow.style.visibility = hidden ? 'hidden' : ''; }
+    el.style.transform = `translate(${S.x}px, ${S.y + hopY}px)`;
+    const air = clamp((groundY() - S.y - hopY)/(20*u), 0, 1), sw = 13*u*(1 - air*.5);
+    shadow.style.width = sw+'px'; shadow.style.left = (center() - sw/2)+'px'; shadow.style.top = (surfaceY() - 4)+'px'; shadow.style.opacity = 1 - air*.6;
+
+    let lx = 0, ly = 0; const cx = center(), cy = S.y + 3*u;
+    if (st==='walk' || st==='seek' || st==='exit' || st==='enter'){ lx = S.moveDir*.45; ly = st==='seek' ? .3 : 0; }
+    else if (st==='look'){ lx = [-.45, .45, -.3, .45][Math.floor(S.stateT/.65) % 4]; ly = -.15; }
+    else if (S.lookAt && S.t < S.lookAt.until){ lx = clamp((S.lookAt.x-cx)/(25*u), -1, 1)*.45; ly = clamp((S.lookAt.y-cy)/(25*u), -1, 1)*.35; }
+    else if (st==='type' && typingField){ lx = clamp((typingField[0]+typingField[2]/2-cx)/(25*u), -1, 1)*.45; ly = .35; }
+    else if (st==='chase' && ball){ lx = clamp((ball.x+ball.size/2-cx)/(10*u), -1, 1)*.45; ly = clamp((ball.y-cy)/(10*u), -1, 1)*.35; }
+    else if (S.t - pointer.t < 5){ lx = clamp((pointer.x-cx)/(25*u), -1, 1)*.45; ly = clamp((pointer.y-cy)/(25*u), -1, 1)*.35; }
+    else lx = Math.sin(t*.4)*.25;
+    const ease = 1 - Math.pow(st==='look' ? .6 : .8, frameDt*60);
+    S.lookX += (lx - S.lookX)*ease; S.lookY += (ly - S.lookY)*ease;
+
+    let torsoY = reduce ? 0 : Math.sin(t*2.2)*.12, armLy = 4, armRy = 4, legH = [2,2,2,2], legTop = 8;
+    let eyeY = 2 + S.lookY, eyeH = 2, eyeW = .9, eyeLx = 2 + S.lookX, eyeRx = 9.1 + S.lookX, sx = 1, sy = 1;
+    const walking = st==='walk' || st==='seek' || st==='chase' || st==='exit' || st==='enter';
+    const sad = (stats.food < 15 || stats.joy < 20) && (st==='idle' || st==='sit' || st==='look');
+    if (walking){ const ph = Math.floor(t*(st==='chase'?12:8)) % 2; legH = ph ? [1.4,2,1.4,2] : [2,1.4,2,1.4]; armLy = ph ? 3.7 : 4.3; armRy = ph ? 4.3 : 3.7; torsoY = ph ? -.15 : 0; }
+    if (sad){ eyeY = 2.7 + S.lookY*.5; eyeH = 1.3; }
+    if (st==='happy'){ armLy = armRy = 2.6; eyeY = 2.8; eyeH = .7; }
+    if (st==='sit'){ torsoY = .9 + (reduce ? 0 : Math.sin(t*1.6)*.08); legTop = 9; legH = [1,1,1,1]; armLy = armRy = 4.9; }
+    if (st==='stretch'){ const k = Math.sin(clamp(S.stateT/1.8, 0, 1)*Math.PI); armLy = armRy = 4 - 3.2*k; sy = 1 + .1*k; sx = 1 - .04*k; if (k > .6){ eyeY = 2.8; eyeH = .35; } }
+    if (st==='wave'){ armRy = Math.floor(S.stateT*6) % 2 ? 1 : 2.6; eyeY = 2.8; eyeH = .7; }
+    if (st==='dance'){ const ph = Math.floor(S.stateT*5) % 2; armLy = ph ? 2.2 : 4.2; armRy = ph ? 4.2 : 2.2; sx = ph ? 1.04 : .96; eyeY = 2.8; eyeH = .7; }
+    if (st==='type'){ const ph = Math.floor(t*10) % 2; armLy = ph ? 3.5 : 4.3; armRy = ph ? 4.3 : 3.5; torsoY = .2; }
+    if (st==='alert'){ armLy = armRy = 2.2; eyeH = 2.4; eyeY = 1.8 + S.lookY*.5; }
+    if (st==='cover'){ armLy = armRy = 1.4; eyeY = 2.9; eyeH = .3; eyeW = 1.3; eyeLx = 1.8; eyeRx = 8.9; torsoY = .3; }
+    if (st==='crouch'){ sx = 1.12; sy = .8; eyeY += .3; armLy = armRy = 4.6; }
+    if (st==='eat'){ const c = Math.floor(t*8)%2; torsoY = c ? .3 : 0; eyeY = 2.9; eyeH = .6; armLy = armRy = c ? 3.4 : 4; }
+    if (st==='held'){ const k = Math.sin(t*9)*.4; legH = [2.5+k, 2.5-k, 2.5+k, 2.5-k]; armLy = armRy = 2.4; eyeH = 2.4; eyeY = 1.8; }
+    if (st==='fall'){ armLy = armRy = 2.2; eyeH = 2.4; eyeY = 1.8; }
+    if (st==='sleep'){ torsoY = .8 + Math.sin(t*1.4)*.15; legH = [1.2,1.2,1.2,1.2]; legTop = 8.8; armLy = armRy = 5.2; eyeY = 3.6; eyeH = .35; eyeW = 1.4; eyeLx = 1.8; eyeRx = 8.8; }
+    if (S.blinkT > 0 && !['sleep','happy','eat','wave','dance','cover'].includes(st)){ eyeY += eyeH/2 - .15; eyeH = .3; }
+    if (S.squashT > 0){ const k = S.squashT/.25; sx = 1 + .12*k; sy = 1 - .15*k; }
+
+    setA(P.torso, 'transform', `translate(0 ${torsoY.toFixed(3)})`);
+    setA(P.squash, 'transform', `translate(6 10) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-6 -10)`);
+    setR(P.armL, -2, armLy, 2, 2); setR(P.armR, 12, armRy, 2, 2);
+    [1,3,8,10].forEach((x,i)=>setR(P.legs[i], x, legTop, 1, legH[i]));
+    setR(P.eyeL, eyeLx, eyeY, eyeW, eyeH); setR(P.eyeR, eyeRx, eyeY, eyeW, eyeH);
+
+    snacks.forEach(s => { s.el.style.width = s.el.style.height = s.size+'px'; s.el.style.transform = `translate(${s.x}px, ${s.y}px)`; });
+    if (ball){ ball.el.style.width = ball.el.style.height = ball.size+'px'; ball.el.style.transform = `translate(${ball.x}px, ${ball.y}px)`; }
+    if (bubble.classList.contains('on')){
+      const bw = bubble.offsetWidth, bh = bubble.offsetHeight, want = clamp(center(), 20, W - 20), left = clamp(want - bw/2, 8, Math.max(8, W - bw - 8));
+      const above = S.y + hopY - bh - 4, top = above >= 6 ? above : S.y + hopY + SH + 6;
+      bubble.style.transform = `translate(${left}px, ${top}px)`;
+      bubble.style.setProperty('--tail', clamp(want - left, 14, bw - 14)+'px');
+    }
+  }
+
+  // ---------- interaction ----------
+  function pet(){
+    if (OFFSTAGE.has(S.state)){ comeBack(); return; }
+    if (S.state==='sleep'){ say(pick(['Five more minutes…','…huh? I\'m up.'])); go('idle'); return; }
+    if (S.state==='held' || S.state==='fall' || S.state==='crouch') return;
+    stats.joy = Math.min(100, stats.joy + 8); hearts(3); say(fresh(PET), 1600); go('happy');
+  }
+  function toggleNap(){
+    if (OFFSTAGE.has(S.state)){ comeBack(); return; }
+    if (S.state==='sleep'){ say('Back online.'); go('idle'); }
+    else if (!BUSY.has(S.state)){ say('Nap time.'); go('sleep'); }
+  }
+  function comeHere(x){
+    if (OFFSTAGE.has(S.state)){ comeBack(); return; }
+    if (S.on){ hopDown(x > center() ? 1 : -1); return; }
+    go('walk', { tx: clamp(x - 9*u, 0, Math.max(0, W-SW)) }); say('Coming!', 1200);
+  }
+  function toggleStay(){
+    prefs.stay = !prefs.stay; save();
+    if (prefs.stay){ say('Okay, I\'ll stay right here.'); if (S.state==='walk' || S.state==='exit') go('idle'); }
+    else say('Free to roam!');
+  }
+
+  let drag = null;
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || OFFSTAGE.has(S.state)) return;
+    e.preventDefault(); el.setPointerCapture(e.pointerId); closeMenu();
+    const r = stage.getBoundingClientRect();
+    drag = { id:e.pointerId, sx:e.clientX, sy:e.clientY, ox:e.clientX - r.left - S.x, oy:e.clientY - r.top - S.y, moved:false, hist:[] }; syncNative();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const r = stage.getBoundingClientRect();
+    if (!drag.moved && Math.hypot(e.clientX-drag.sx, e.clientY-drag.sy) > 6){
+      drag.moved = true; el.classList.add('held'); S.on = null;
+      say(S.state==='sleep' ? 'Hey! I was sleeping!' : pick(['Wheee!','Where are we going?','Up we go!']), 1500); go('held');
+    }
+    if (drag.moved){
+      S.x = clamp(e.clientX - r.left - drag.ox, 0, W-SW); S.y = clamp(e.clientY - r.top - drag.oy, -2*u, groundY());
+      drag.hist.push({x:S.x, y:S.y, t:performance.now()}); if (drag.hist.length > 6) drag.hist.shift();
+    }
+  });
+  function release(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    el.classList.remove('held');
+    if (drag.moved){
+      const h = drag.hist, a = h[0], b = h[h.length-1], dt = a && b ? Math.max(16, b.t - a.t)/1000 : 1;
+      S.vx = a&&b ? clamp((b.x-a.x)/dt, -150*u, 150*u) : 0; S.vy = a&&b ? clamp((b.y-a.y)/dt, -150*u, 150*u) : 0; go('fall');
+    } else pet();
+    drag = null; syncNative();
+  }
+  el.addEventListener('pointerup', release); el.addEventListener('pointercancel', release);
+  el.addEventListener('keydown', e => {
+    if (e.key==='Enter' || e.key===' '){ e.preventDefault(); pet(); }
+    if (e.key==='ContextMenu' || (e.shiftKey && e.key==='F10')){ e.preventDefault(); openMenu(center(), S.y + 4*u); }
+  });
+  window.addEventListener('mousemove', e => { const r = stage.getBoundingClientRect(); pointer.x = e.clientX - r.left; pointer.y = e.clientY - r.top; pointer.t = S.t; wake(); });
+
+  // ---------- Clawd's menu ----------
+  let menuAt = { x:0, y:0 };
+  function buildMenu(){
+    menu.textContent = '';
+    const item = (label, fn, checked) => {
+      const b = document.createElement('button'); b.className = 'item'; b.type = 'button'; b.setAttribute('role','menuitem');
+      const s = document.createElement('span'); s.textContent = label; b.appendChild(s);
+      if (checked){ const c = document.createElement('span'); c.className = 'check'; c.textContent = '✓'; b.appendChild(c); }
+      b.addEventListener('click', () => { closeMenu(); fn(); }); menu.appendChild(b);
+    };
+    const hr = () => menu.appendChild(document.createElement('hr'));
+    const opt = (label, entries, current, onPick, render) => {
+      const row = document.createElement('div'); row.className = 'opt';
+      const l = document.createElement('span'); l.textContent = label; row.appendChild(l);
+      const seg = document.createElement('div'); seg.className = 'seg';
+      entries.forEach(k => {
+        const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(k===current)); b.setAttribute('aria-label', label+' '+k);
+        render(b, k); b.addEventListener('click', () => { onPick(k); buildMenu(); }); seg.appendChild(b);
+      });
+      row.appendChild(seg); menu.appendChild(row);
+    };
+    const needs = document.createElement('div'); needs.className = 'needs';
+    [['Food', stats.food], ['Energy', stats.energy], ['Mood', stats.joy]].forEach(([label, v]) => {
+      const l = document.createElement('span'); l.textContent = label;
+      const bar = document.createElement('div'); bar.className = 'bar'; bar.setAttribute('role','meter'); bar.setAttribute('aria-label', label); bar.setAttribute('aria-valuenow', Math.round(v));
+      const fill = document.createElement('i'); fill.style.width = Math.round(v)+'%'; if (v < 25) fill.className = 'low'; bar.appendChild(fill);
+      needs.append(l, bar);
+    });
+    menu.appendChild(needs); hr();
+    item('Come here', () => comeHere(menuAt.x));
+    item('Drop a snack', () => dropSnack(menuAt.x));
+    item('Throw the ball', throwBall);
+    item(S.state==='sleep' ? 'Wake up' : 'Take a nap', toggleNap);
+    item('Stay put', toggleStay, prefs.stay);
+    hr();
+    opt('Color', Object.keys(COLORS), prefs.color, k => { prefs.color = k; applyColor(); save(); }, (b,k) => { const s = document.createElement('span'); s.className = 'swatch'; s.style.background = COLORS[k]; b.appendChild(s); });
+    opt('Size', Object.keys(SIZES), prefs.size, k => { prefs.size = k; save(); measure(); }, (b,k) => { b.textContent = k; });
+    if (mode==='overlay'){
+      hr();
+      item('Hide Clawd', hideClawd);
+    }
+  }
+  function openMenu(x, y){
+    menuAt = { x, y }; buildMenu(); menu.hidden = false;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.left = clamp(x + 4, 6, W - mw - 6)+'px'; menu.style.top = clamp(y - mh - 4 < 6 ? y + 4 : y - mh/2, 6, H - mh - 6)+'px';
+    menu.querySelector('button')?.focus({ preventScroll:true }); syncNative();
+  }
+  function closeMenu(){ if (menu.hidden) return; menu.hidden = true; syncNative(); }
+  el.addEventListener('contextmenu', e => { e.preventDefault(); const r = stage.getBoundingClientRect(); openMenu(e.clientX - r.left, e.clientY - r.top); });
+  stage.addEventListener('pointerdown', e => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key==='Escape') closeMenu(); });
+
+  // Test hook: only with #debug in the URL (the test harness uses it; the app never does).
+  if (location.hash === '#debug') window.clawdDebug = { S, stats, prefs, go, decide, planClimb, planExit, hopDown, onIdle, onApp, onUi, think, platforms:() => platforms };
+
+  // ---------- desktop app ----------
+  const OVERLAY_OPTS = { frame:false, transparent:true, alwaysOnTop:true, hasShadow:false, resizable:false, movable:false,
+                         minimizable:false, maximizable:false, fullscreenable:false, dragHeight:0 };
+  let desktop = null, ignoring = null, winBounds = { x:0, y:0 };
+  // Native Mac app bridge (native/ folder): a WKWebView host that posts to window.webkit.messageHandlers.clawd.
+  // There Swift decides click-through itself from the rects syncNative() sends, so setIgnore is only for the Claude desktop app.
+  const nativeHost = window.webkit?.messageHandlers?.clawd || null;
+  function setIgnore(v){
+    if (v === ignoring) return;
+    if (!desktop?.window) return;
+    ignoring = v; desktop.window.setIgnoreMouseEvents(v, v ? { forward:true } : undefined).catch(()=>{});
+  }
+  function greeting(){
+    if (prefs.stay) return 'Staying put, like you asked. Untick Stay put in my menu to let me roam.';
+    if (!lastSeen) return 'Hi! I\'m Clawd. Right-click me for snacks and more.';
+    const h = new Date().getHours(), mins = (Date.now() - lastSeen)/60000;
+    if (mins > 360) return h >= 5 && h < 12 ? 'Good morning! I missed you.' : h >= 18 ? 'Good evening! I missed you.' : 'You\'re back! I missed you.';
+    if (mins > 10) return 'I\'m back!';
+    return pick(['Hi again!','Back on duty.']);
+  }
+  function startNative(){
+    mode = 'overlay'; root.classList.add('overlay');
+    window.clawdNative = {
+      pointer(x, y){ pointer.x = x; pointer.y = y; pointer.t = S.t; wake(); },
+      snack(){ dropSnack(); }, ball(){ throwBall(); }, nap(){ toggleNap(); }, pet(){ pet(); },
+      napping(){ return S.state === 'sleep'; },
+      stay(){ toggleStay(); },
+      idle(sec, keys){ if (keys != null) keyIdle = +keys; onIdle(+sec || 0); },
+      ui(e){ onUi(e); },
+      windows(list){ setPlatforms(list); },
+      app(id, name){ onApp(String(id || ''), String(name || '')); },
+      size(k){ if (SIZES[k]){ prefs.size = k; save(); measure(); wake(); } },
+      color(k){ if (COLORS[k]){ prefs.color = k; applyColor(); save(); wake(); } },
+      visible(v){ nativeHidden = !v; last = performance.now(); if (v) wake(); },
+      save(){ save(); return true; }
+    };
+    measure();
+    S.x = clamp(W*.7, 0, W-SW); S.y = -SH; S.vx = S.vy = 0; go('fall');
+    setTimeout(() => say(greeting(), 4200), 1000);
+  }
+  function overInteractive(){
+    if (drag || !menu.hidden) return true;
+    const p = pointer, inBox = (x,y,w,h) => p.x>=x && p.x<=x+w && p.y>=y && p.y<=y+h;
+    if (inBox(S.x + u, S.y + hopY - u, 16*u, 13*u)) return true;
+    if (ball && inBox(ball.x, ball.y, ball.size, ball.size)) return true;
+    return false;
+  }
+  // Native host: tell Swift where clicks should land (it hit-tests the cursor itself) and what the menu bar should show.
+  let sentHit = '', sentHitAt = 0, sentAll = null, sentState = '';
+  function syncNative(){
+    if (!nativeHost) return;
+    const pad = 6, R = (x,y,w,h) => [x-pad, y-pad, w+pad*2, h+pad*2].map(Math.round);
+    const rects = [R(S.x + u, S.y + hopY - u, 16*u, 13*u)];
+    if (ball) rects.push(R(ball.x - Math.abs(ball.vx)*.05, ball.y - Math.abs(ball.vy)*.05, ball.size + Math.abs(ball.vx)*.1, ball.size + Math.abs(ball.vy)*.1));
+    const all = !!drag || !menu.hidden, hit = JSON.stringify([all, rects]), now = performance.now();
+    if (hit !== sentHit && (now - sentHitAt > 33 || all !== sentAll)){
+      sentHit = hit; sentHitAt = now; sentAll = all; nativeHost.postMessage({ type:'hit', all, rects });
+    }
+    const r5 = v => Math.round(v/5)*5, food = r5(stats.food), energy = r5(stats.energy), joy = r5(stats.joy);
+    const state = JSON.stringify([prefs.size, prefs.color, prefs.stay, S.state==='sleep', food, energy, joy]);
+    if (state !== sentState){
+      sentState = state; nativeHost.postMessage({ type:'state', size:prefs.size, color:prefs.color, stay:prefs.stay, sleeping:S.state==='sleep', food, energy, joy });
+    }
+  }
+  function drawClawd(g, size, color, eye, pad){
+    const unit = (size - pad*2)/16, ox = pad + 2*unit, oy = (size - 10*unit)/2;
+    const R = (x,y,w,h) => g.fillRect(Math.round(ox+x*unit), Math.round(oy+y*unit), Math.round(w*unit), Math.round(h*unit));
+    g.fillStyle = color; R(0,0,12,8); R(-2,4,2,2); R(12,4,2,2); [1,3,8,10].forEach(x=>R(x,8,1,2));
+    if (eye){ g.fillStyle = eye; R(2,2,1,2); R(9,2,1,2); }
+    else { g.clearRect(Math.round(ox+2*unit), Math.round(oy+2*unit), Math.ceil(unit), Math.round(2*unit)); g.clearRect(Math.round(ox+9*unit), Math.round(oy+2*unit), Math.ceil(unit), Math.round(2*unit)); }
+  }
+  function appIcon(){
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    const grd = g.createLinearGradient(0,0,0,256); grd.addColorStop(0,'#2A221C'); grd.addColorStop(1,'#15110E');
+    g.fillStyle = grd; g.beginPath(); g.roundRect(12,12,232,232,54); g.fill();
+    drawClawd(g, 256, '#D77757', '#1A1614', 44); return c.toDataURL('image/png');
+  }
+  function trayIcon(){ const c = document.createElement('canvas'); c.width = c.height = 36; drawClawd(c.getContext('2d'), 36, '#000', null, 1); return c.toDataURL('image/png'); }
+
+  async function hideClawd(){
+    if (nativeHost){ nativeHost.postMessage({ type:'hide' }); return; }
+    const st = await desktop.permissions.state('menu-bar').catch(()=>'unavailable');
+    if (st !== 'granted'){ say('I need the menu bar icon to come back from hiding, so I\'ll stay.'); return; }
+    desktop.window.hide().catch(()=>{});
+  }
+  async function setTray(){
+    const st = await desktop.permissions.state('menu-bar').catch(()=>'unavailable');
+    if (st !== 'granted') return;
+    desktop.tray.set({ icon:trayIcon(), toolTip:'Desk Clawd', menu:[
+      { label:'Show Clawd', click:()=>desktop.window.show().catch(()=>{}) },
+      { label:'Hide Clawd', click:()=>desktop.window.hide().catch(()=>{}) },
+      { type:'separator' },
+      { label:'Drop a snack', click:()=>dropSnack() },
+      { label:'Throw the ball', click:throwBall },
+      { label:'Nap or wake up', click:toggleNap }
+    ]}).catch(()=>{});
+  }
+  async function startOverlay(){
+    mode = 'overlay'; root.classList.remove('gate'); root.classList.add('overlay');
+    try {
+      const ds = await desktop.screen.getAllDisplays();
+      const d = ds.find(d => d.bounds.x===0 && d.bounds.y===0) || ds[0];
+      if (d) await desktop.window.setBounds(d.workArea);
+    } catch(e){}
+    try { winBounds = await desktop.window.getBounds(); } catch(e){}
+    // Join every Space, full-screen apps included. Retry once the window has settled, and say so if the system refuses.
+    let spacesError = null;
+    const joinSpaces = () => desktop.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen:true })
+      .then(() => { spacesError = null; }).catch(e => { spacesError = e; });
+    await joinSpaces();
+    setTimeout(async () => { await joinSpaces(); if (spacesError) say('I can\'t follow you into full-screen apps here (' + String(spacesError.message||spacesError).split(':')[0] + ').', 6000); }, 2500);
+    window.addEventListener('focus', joinSpaces);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible') joinSpaces(); });
+    ignoring = null; setIgnore(true);
+    measure();
+    S.x = clamp(W*.7, 0, W-SW); S.y = -SH; S.vx = S.vy = 0; go('fall');
+    setTimeout(() => say(greeting(), 4200), 1000);
+    setTray();
+    let busy = false;
+    setInterval(async () => {
+      if (busy) return; busy = true;
+      try { const p = await desktop.screen.getCursorScreenPoint(); const x = p.x - winBounds.x, y = p.y - winBounds.y;
+            if (x !== pointer.x || y !== pointer.y){ pointer.x = x; pointer.y = y; pointer.t = S.t; wake(); } } catch(e){}
+      busy = false;
+    }, 100);
+  }
+  async function becomeOverlay(){
+    const res = await desktop.window.setOptions(OVERLAY_OPTS);
+    if (res.reloading) return;
+    if (res.applied === 'next_open'){ setIntro('Almost there. Quit Desk Clawd and open it again, and Clawd will be out on your screen.'); return; }
+    await startOverlay();
+  }
+  function setIntro(text, buttons){
+    $('introText').textContent = text;
+    const row = $('introActions'); row.textContent = '';
+    (buttons||[]).forEach(([label, fn, ghost]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (ghost?' ghost':''); b.textContent = label; b.addEventListener('click', fn); row.appendChild(b); });
+  }
+  async function letOut(){
+    try {
+      const r = await desktop.permissions.request(['overlay','menu-bar']);
+      if (r.overlay === 'granted') return becomeOverlay();
+      if (r.overlay === 'denied') setIntro('Clawd isn\'t allowed to float over your screen yet. Turn on the floating window in Permissions.', [['Open Permissions', () => desktop.permissions.manage().catch(()=>{})]]);
+      else setIntro('Floating windows aren\'t available here right now. Try again in a moment.', [['Try again', letOut]]);
+    } catch(e){ setIntro('Something went wrong: ' + e.message, [['Try again', letOut]]); }
+  }
+
+  (async () => {
+    if (nativeHost) return startNative();
+    try { desktop = await window.claude?.use?.('desktop'); } catch(e){ desktop = null; }
+    if (!desktop?.window){
+      const st = await desktop?.install?.state().catch(()=>'unavailable');
+      if (st === 'available') setIntro('A small Clawd who lives along the bottom of your screen. Install it as an app and Clawd walks over your other windows.', [['Install as app', () => {
+        desktop.install.request().then(r => { if (r==='installed') setIntro('Installed. Open Desk Clawd from your Dock or Launchpad and Clawd steps out onto your screen.'); }).catch(()=>{});
+      }]]);
+      else if (st === 'installed') setIntro('Desk Clawd is installed. Open it from your Dock or Launchpad and Clawd steps out onto your screen.');
+      return;
+    }
+    // Inside the installed app: never show a page. Go straight onto the desktop.
+    desktop.app.dock.setIcon(appIcon()).catch(()=>{});
+    let applied = {};
+    try { applied = (await desktop.window.getOptions()).applied || {}; } catch(e){}
+    const st = await desktop.permissions.state('overlay').catch(()=>'unavailable');
+    if (applied.transparent && st === 'granted') return startOverlay();
+    if (st === 'granted') return becomeOverlay().catch(e => setIntro('Something went wrong: ' + e.message, [['Try again', letOut]]));
+    // First launch: the OS needs one click to allow floating. Show only a small card.
+    mode = 'gate'; root.classList.add('gate');
+    desktop.window.place({ anchor:'center', width:380, height:280 }).catch(()=>{});
+    $('intro').querySelector('h1').textContent = 'Let Clawd out?';
+    setIntro('Clawd will walk along the bottom of your screen, on top of your windows. Clicks pass straight through everywhere except Clawd.', [['Let Clawd out', letOut]]);
+  })();
+
+  // ---------- loop ----------
+  // Frame rate follows what is on screen: 60 fps for physics (toss, fall, ball), 30 fps for walking and
+  // other small motion, 12 fps when Clawd only breathes and blinks, and nothing at all while hidden.
+  const PHYSICS = new Set(['held','fall','chase','crouch']), MOTION = new Set(['walk','seek','happy','eat','exit','enter','stretch','wave','dance','type','alert']);
+  let last = performance.now(), loopTimer = 0, loopRAF = 0, nativeHidden = false;
+  const paused = () => nativeHidden || document.hidden;
+  function tier(){
+    if (drag || ball || S.squashT > 0 || PHYSICS.has(S.state) || snacks.some(s => !s.landed)) return 2;
+    if (MOTION.has(S.state) || S.t - pointer.t < .4) return 1;
+    return 0;
+  }
+  const moving = () => tier() > 0;
+  function schedule(){
+    if (loopTimer || loopRAF || paused()) return;
+    if (mode === 'gate') { loopTimer = setTimeout(frame, 500); return; }
+    const k = tier();
+    if (k === 2) loopRAF = requestAnimationFrame(frame);
+    else loopTimer = setTimeout(frame, k === 1 ? 1000/30 : 1000/12);
+  }
+  wake = () => { if (loopTimer){ clearTimeout(loopTimer); loopTimer = 0; } if (paused()) return; if (!loopRAF) last = Math.max(last, performance.now() - 100); schedule(); };
+  function frame(){
+    loopTimer = loopRAF = 0;
+    if (paused()) return;
+    const now = performance.now(), dt = Math.min(moving() ? .05 : .1, (now - last)/1000); last = now;
+    if (mode !== 'gate'){ update(dt); render(); syncNative(); }
+    if (mode === 'overlay' && !nativeHost) setIgnore(!overInteractive());
+    schedule();
+  }
+  document.addEventListener('visibilitychange', () => { last = performance.now(); wake(); });
+  render(); schedule();
+})();
+</script>
